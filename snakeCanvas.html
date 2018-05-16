@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>贪吃蛇游戏canvas</title>
+		<style type="text/css">
+			.snake-game {
+                margin: 100px auto;
+                width: 600px;
+            }
+            
+            h1 {
+                text-align: center;
+                color: #424242;
+                font-size: 16px;
+                line-height: 24px;
+            }
+            
+            h3 {
+                text-align: center;
+                color: #F6443E;
+                font-size: 14px;
+                line-height: 20px;
+                margin: 10px 0;
+            }
+            
+            span {
+                font-size: 15px;
+                font-weight: 600;
+            }
+            
+            button {
+                border: none;
+                border-radius: 4px;
+                padding: 4px 12px;
+                font-size: 14px;
+                line-height: 18px;
+                background-color: #64b5f6;
+                color: #fff;
+                box-shadow: 0 2px 5px 1px rgba(0, 177, 254, 0.3);
+                display: inline-block;
+                margin-right: 10px;
+            }
+            
+            button:first-child {
+                margin-left: 28%;
+            }
+            
+            #start {
+                margin-left: 28%;
+            }
+            
+            .snake-map {
+                margin: 20px auto;
+                border: 1px solid #36a4fd;
+                width: 400px;
+                height: 500px;
+                display: block;
+            }
+		</style>
+	</head>
+	<body>
+	    <div class="snake-game">
+            <h1>贪吃蛇</h1>
+            <h3>分数：<span id="score"></span></h3>
+            <!--开始 暂停 刷新 加速 游戏按钮-->
+            <button id="start">开始</button>
+            <button id="pause">暂停</button>
+            <button id="refresh">刷新</button>
+            <button id="speed">加速</button>
+            <!--画布-->
+            <div class="snake-map">
+                <canvas id="snakeMap" width="400" height="500"></canvas>
+            </div>
+            
+        </div>
+        <script>
+            // 获取贪吃蛇行走路径画布ID
+            var canvas = document.getElementById("snakeMap");
+            var snakeMap = canvas.getContext("2d");
+            // 获取分数id
+            var scoreMsg = document.getElementById("score");
+            // 记录分数(即蛇所吃食物个数，默认为0)
+            var score = 0;
+            // 记录蛇移动方向默认为向右
+            var direction = 'right';
+            // 画布宽度（列数乘以每小格宽度）
+            var mapWidth = 400;
+            // 画布高度（行数数乘以每小格高度）
+            var mapHeight = 500;
+            // 每个格子宽高
+            var grid = 20;
+            // 画布行数
+            var lineNum = mapHeight / grid;
+            // 画布列数
+            var columnNum = mapWidth / grid;
+            // 记录随机生成食物所在位置
+            var foodX = 0;
+            var foodY = 0;
+            // 创建蛇(用来储存蛇身div的数组)
+            var snakeArr = [];
+            // 用来记录画布上所有小方块位置的数组
+            var mapDivPosition = [];
+            // 设置蛇移动定时器
+            var _snakeMoveTimer = null;
+            // 默认清除定时事件
+            clearInterval(_snakeMoveTimer);
+            // 添加定时移动时间
+            var time = 300;
+            // 给加速点击事件添加节流阀
+            var isSpeed = true;
+            // 获取页面相关按钮id
+            var pause = document.getElementById('pause');
+            var start = document.getElementById('start');
+            var refresh = document.getElementById('refresh');
+            var speed = document.getElementById('speed');
+            
+            // 初始化事件(随机生成食物)
+            function init () {
+                // 默认分数为0
+                scoreMsg.innerHTML = score || 0;
+                setTimeout(function() {
+                    createNewFood().draw();
+                }, 200);
+            }
+            
+            // 画布内蛇身方块和食物方块对象
+            function Diamond (x, y, w, h, c) {
+                this.x = x;
+                this.y = y;
+                this.w = w;
+                this.h = h;
+                this.c = c;
+            }
+            
+            // canvas根据对应坐标绘制蛇身方块和食物方块
+            Diamond.prototype.draw = function (type) {
+                if (type == 'snake') {
+                    snakeMap.strokeStyle = this.c;
+                    snakeMap.strokeRect(this.x, this.y, this.w, this.h);
+                } else {
+                    snakeMap.fillStyle = this.c;
+                    snakeMap.fillRect(this.x, this.y, this.w, this.h);
+                }
+            }
+            
+            // 创建蛇对象
+            function Snake () {
+                for (var i = 0; i < 3; i++) {
+                    // 添加蛇身颜色样式
+                    snakeArr.push(new Diamond(i * grid, 0, grid, grid, '#4a88ab')); 
+                }
+                drawSnake();
+            }
+            
+            // 蛇移动事件
+            Snake.prototype.move = function () {
+                // 如果蛇身移动了点击加速按钮才能生效
+                isSpeed = true;
+                // 默认清空画布
+                snakeMap.clearRect(0, 0, canvas.width, canvas.height);
+                // 根据蛇移动方向来确定蛇身坐标位置
+                var snakeHead = snakeArr.slice(snakeArr.length - 1)[0];
+                switch(direction) {
+                    case 'left':
+                        snakeHead = new Diamond(snakeHead.x - grid, snakeHead.y, grid, grid, '#4a88ab');
+                        break;
+                    case 'up':
+                        snakeHead = new Diamond(snakeHead.x, snakeHead.y - grid, grid, grid, '#4a88ab');
+                        break;
+                    case 'right':
+                        snakeHead = new Diamond(snakeHead.x + grid, snakeHead.y, grid, grid, '#4a88ab');
+                        break;
+                    case 'down':
+                        snakeHead = new Diamond(snakeHead.x, snakeHead.y + grid, grid, grid, '#4a88ab');
+                        break;
+                }
+                // 判断蛇身是否出画布
+                if (snakeHead.x < 0 || snakeHead.x > (columnNum - 1) * grid || snakeHead.y < 0 || snakeHead.y > (lineNum - 1) * grid) {
+                    // 游戏结束
+                    alert("你瞎吗？撞死啦！");
+                    // 清除定时事件
+                    clearInterval(_snakeMoveTimer);
+                    return false;
+                }
+                // 判断蛇头是否碰撞到蛇身(即循环判断蛇头位置与蛇身位置是否有重合)
+                for(var i = 1; i < snakeArr.length; i ++) {
+                    if (snakeHead.x == snakeArr[i].x && snakeHead.y == snakeArr[i].y) {
+                        // 游戏结束
+                        alert("你傻呀！连自己都吃？");
+                        // 清除定时事件
+                        clearInterval(_snakeMoveTimer);
+                        return false;
+                    }
+                }
+                // 判断蛇头移动位置是否有食物(即蛇头位置与食物位置重合)，如果有即蛇身长度加一
+                // 默认在蛇头前添加一个方块（如果没有吃到食物即蛇蛇尾减少一个方块，吃到食物即不减少）
+                snakeArr.push(snakeHead);
+                if (foodX == snakeHead.x && foodY == snakeHead.y) {
+                    // 分数加一
+                    score++;
+                    // 再随机生成食物
+                    createNewFood().draw();
+                } else {
+                    // 蛇移动起来...逻辑是蛇尾变成蛇头
+                    snakeArr.shift();
+                }
+                // 画出食物和蛇身
+                var food = new Diamond(foodX, foodY, grid, grid, '#F6443E');
+                food.draw();
+                drawSnake();
+                scoreMsg.innerHTML = score;
+            }
+            
+            // 绘制蛇身
+            function drawSnake () {
+                for(var i = 0; i < snakeArr.length; i++) {
+                    if (i < snakeArr.length - 1) {
+                        snakeArr[i].draw('snake');
+                    } else {
+                        snakeArr[i].draw();
+                    }
+                }
+            }
+            
+            // 随机生成食物事件
+            function createNewFood () {
+                foodX = Random(0, columnNum - 1) * grid;
+                foodY = Random(0, lineNum - 1) * grid;
+                // 如果蛇吃掉了食物(即蛇身与食物位置有重合的)再重新生成食物，否则定义食物样式
+                for(var i = 0; i < snakeArr.length; i ++) {
+                    if (snakeArr[i].x == foodX && snakeArr[i].y == foodY) {
+                        createNewFood();
+                    } else {
+                        return new Diamond(foodX, foodY, grid, grid, '#F6443E');
+                    }
+                }
+            }
+            
+            // 生成指定区间内随机整数
+            function Random (min, max) {
+                return Math.floor(Math.random() * (max - min + 1) + min);
+            }
+            
+            
+            // 键盘点击上下左右，蛇身移动方向发生改变
+            document.onkeydown = function(event) {
+                // 有事件对象就用事件对象，没有就自己创建一个，兼容低版本浏览器  
+                var event = event || window.event;  
+                switch(event.keyCode)  
+                {  
+                    // 不允许返回(即向左的时候就不能向右) 
+                    case 37:  
+                        if (direction != "right") {  
+                            direction = "left";  
+                        }  
+                        break; 
+                    case 38:  
+                        if (direction != 'down') {
+                            direction = "up";  
+                        }  
+                        break;  
+                    case 39:  
+                        if (direction != "left") {  
+                            direction = "right";  
+                        }  
+                        break;  
+                    case 40:  
+                        if (direction != "up") {  
+                            direction = "down";  
+                        }  
+                        break;  
+                }  
+            }
+            
+            var snake = new Snake();
+            
+            // 开始事件
+            start.onclick = function() {
+                clearInterval(_snakeMoveTimer);
+                _snakeMoveTimer = setInterval('snake.move()', time);
+            }
+            
+            
+            // 加速事件
+            speed.onclick = function() {
+                if (isSpeed) {
+                    clearInterval(_snakeMoveTimer);
+                    time = time - 20;
+                    _snakeMoveTimer = setInterval('snake.move()', time);
+                    isSpeed = false;
+                }
+            }
+            
+            // 暂停事件
+            pause.onclick = function() {
+                clearInterval(_snakeMoveTimer);
+            }
+            
+            // 刷新事件
+            refresh.onclick = function() {
+                window.location.reload();
+            }
+            
+            // 页面初始化事件
+            init();
+            
+        </script>
+	</body>
+</html>
